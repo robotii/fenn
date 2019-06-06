@@ -14,7 +14,8 @@ endif()
 
 include_directories(src/include src/core)
 
-set( fenn-core
+set(fenn-core
+        src/core/parser.c
         )
 
 add_executable(fenn

@@ -20,10 +20,23 @@
 * IN THE SOFTWARE.
 */
 
-#include <fenn.h>
+#ifndef PARSER_H
+#define PARSER_H
 
-int main(int argc, char **argv) {
-    int i, status;
+/* Function declarations */
+int is_whitespace(uint8_t c);
+int is_symbol_char(uint8_t c);
 
-    return status;
-}
+typedef struct FennParser FennParser;
+
+
+/* The Fenn parser structure */
+struct FennParser {
+    const char *error; // The current error
+    uint8_t *buffer;   // The buffer we are currently parsing
+    int offset;        // Stores the offset into the buffer we are parsing
+    int lineno;        // The current line number
+    int colno;         // The current column number
+};
+
+#endif

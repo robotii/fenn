@@ -20,10 +20,26 @@
 * IN THE SOFTWARE.
 */
 
-#include <fenn.h>
+#ifndef FENN_H
+#define FENN_H
 
-int main(int argc, char **argv) {
-    int i, status;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-    return status;
+#include <config.h>
+
+/* Standard Libraries */
+#include <stdint.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <setjmp.h>
+#include <stddef.h>
+#include <stdio.h>
+
+#ifdef __cplusplus
 }
+#endif
+
+#endif

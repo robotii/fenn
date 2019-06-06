@@ -20,10 +20,15 @@
 * IN THE SOFTWARE.
 */
 
-#include <fenn.h>
+/* Configuration for Fenn */
 
-int main(int argc, char **argv) {
-    int i, status;
+#ifndef FENN_CONFIG_H
+#define FENN_CONFIG_H
 
-    return status;
-}
+#define FENN_VERSION_MAJOR 0
+#define FENN_VERSION_MINOR 0
+#define FENN_VERSION_PATCH 1
+
+#define FENN_VERSION_STRING "0.0.1"
+
+#endif
