@@ -23,20 +23,37 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-/* Function declarations */
-int is_whitespace(uint8_t c);
-int is_symbol_char(uint8_t c);
+// Typedef to make things easier
+typedef struct Parser Parser;
+typedef struct ParseState ParseState;
 
-typedef struct FennParser FennParser;
-
+typedef int (*Consumer)(Parser *p, ParseState *state, uint8_t c);
+struct ParseState {
+    int32_t counter;
+    int32_t argn;
+    int flags;
+    size_t start;
+    Consumer consumer;
+};
 
 /* The Fenn parser structure */
-struct FennParser {
-    const char *error; // The current error
-    uint8_t *buffer;   // The buffer we are currently parsing
-    int offset;        // Stores the offset into the buffer we are parsing
-    int lineno;        // The current line number
-    int colno;         // The current column number
+struct Parser {
+    const char *error;  // The current error
+    ParseState *states; // Store the stack of ParseStates
+    uint8_t *buffer;    // The buffer we are currently parsing
+    size_t statecount;  // Number of states on the stack
+    size_t statecap;    // Amount of memory allocated for states
+    int offset;         // Stores the offset into the buffer we are parsing
+    int lineno;         // The current line number
+    int colno;          // The current column number
 };
+
+/* Function declarations */
+int is_whitespace(uint8_t);
+int is_symbol_char(uint8_t);
+
+void pushstate(Parser *, Consumer, int);
+
+int expression(Parser *, ParseState *, uint8_t);
 
 #endif
