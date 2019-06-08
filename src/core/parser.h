@@ -78,6 +78,7 @@ int escape(Parser *, ParseState *, uint8_t);
 int escapehex(Parser *, ParseState *, uint8_t);
 
 /* Utility functions */
+int checkescape(uint8_t);
 int stringend(Parser *, ParseState *);
 
 /* Creation and destruction */
