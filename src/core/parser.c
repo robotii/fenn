@@ -62,8 +62,33 @@ int is_symbol_char(uint8_t c) {
             c == '|');
 }
 
+/* Get hex digit from a letter */
+int hex(uint8_t c) {
+    if (c >= '0' && c <= '9') {
+        return c - '0';
+    } else if (c >= 'A' && c <= 'F') {
+        return 10 + c - 'A';
+    } else if (c >= 'a' && c <= 'f') {
+        return 10 + c - 'a';
+    } else {
+        return -1;
+    }
+}
+
 /* Parser Utility functions */
-void _pushstate(Parser *p,  ParseState ps) {
+
+/* Push the current consumer onto the state stack */
+void pushstate(Parser *p, Consumer consumer, int flags) {
+    ParseState s;
+    s.counter = 0;
+    s.argn = 0;
+    s.flags = flags;
+    s.consumer = consumer;
+    s.start = p->offset;
+    s.startline = p->lineno;
+    s.startcol = p->colno;
+
+    // Push the state
     size_t oldcount = p->statecount;
     size_t newcount = oldcount + 1;
     if (newcount > p->statecap) {
@@ -76,19 +101,14 @@ void _pushstate(Parser *p,  ParseState ps) {
         p->states = next;
         p->statecap = newcap;
     }
-    p->states[oldcount] = ps;
+    p->states[oldcount] = s;
     p->statecount = newcount;
 }
 
-
-void pushstate(Parser *p, Consumer consumer, int flags) {
-    ParseState s;
-    s.counter = 0;
-    s.argn = 0;
-    s.flags = flags;
-    s.consumer = consumer;
-    s.start = p->offset;
-    _pushstate(p, s);
+void popstate(Parser *p) {
+    ParseState top = p->states[--p->statecount];
+    ParseState *newtop = p->states + p->statecount - 1;
+    // TODO: Process the values returned
 }
 
 void pushbuffer(Parser *p, uint8_t x) {
@@ -108,41 +128,49 @@ void pushbuffer(Parser *p, uint8_t x) {
     p->buffercount = newcount;
 }
 
+/* Consumer functions */
 
 /* Parses a single expression - returns the number of characters consumed */
 int expression(Parser *p, ParseState *state, uint8_t c) {
     switch (c) {
-        /* Special characters */
+        // Special characters
         case '\'': // quote
-        // fallthrough
+            // fallthrough
         case ',':  // unquote
-        // fallthrough
+            // fallthrough
         case ';':  // splice
-        // fallthrough
+            // fallthrough
         case '`':  // quasi-quote
+            pushstate(p, expression, FLAG_READERMAC | c);
             return 1;
 
-        /* String */
+        // String
         case '"':
-            pushstate(p, stringchar, PFLAG_STRING);
+            pushstate(p, stringchar, FLAG_STRING);
             return 1;
 
-        /* Comment until end of line */
+        // Comment until end of line
         case '#':
+            pushstate(p, linecomment, 0);
             return 1;
+
         // Mutable operator
         case '@':
+            pushstate(p, atsymbol, 0);
             return 1;
 
-        /* Open brackets */
+        // Open brackets
         case '(':
+            pushstate(p, expression, FLAG_CONTAINER | FLAG_PARENS);
             return 1;
         case '[':
+            pushstate(p, expression, FLAG_CONTAINER | FLAG_SQRBRACKETS);
             return 1;
         case '{':
+            pushstate(p, expression, FLAG_CONTAINER | FLAG_CURLYBRACKETS);
             return 1;
 
-        /* Close brackets */
+        // Close brackets
         case ')':
         case ']':
         case '}':
@@ -156,24 +184,53 @@ int expression(Parser *p, ParseState *state, uint8_t c) {
                 p->error = "don't know what to do with this character";
                 return 1;
             }
+            pushstate(p, token, 0);
             return 0;
-
     }
 }
 
+int atsymbol(Parser *p, ParseState *state, uint8_t c) {
+    (void) state;
+    p->statecount--; // Discard the current state
+    switch (c) {
+        case '{':
+            pushstate(p, expression, FLAG_CONTAINER | FLAG_CURLYBRACKETS | FLAG_ATSYM);
+            return 1;
+        case '"':
+            pushstate(p, stringchar, FLAG_BUFFER | FLAG_STRING);
+            return 1;
+        case '[':
+            pushstate(p, expression, FLAG_CONTAINER | FLAG_SQRBRACKETS | FLAG_ATSYM);
+            return 1;
+        case '(':
+            pushstate(p, expression, FLAG_CONTAINER | FLAG_PARENS | FLAG_ATSYM);
+            return 1;
+        default:
+            pushstate(p, token, 0);
+            pushbuffer(p, '@'); // Push the leading '@', as it is the start of a symbol
+            return 0;
+    }
+}
+
+/* Parse a single token */
+int token(Parser *p, ParseState *state, uint8_t c) {
+    // TODO: Parse token
+    return 0;
+}
+
 int stringchar(Parser *p, ParseState *state, uint8_t c) {
-    if (state->flags & PFLAG_INSTRING) {
+    if (state->flags & FLAG_INSTRING) {
         // We are inside the long string
         if (c == '"') {
             // We have seen a '"', so we need to check if the string is ending
-            state->flags |= PFLAG_END_CANDIDATE;
-            state->flags &= ~PFLAG_INSTRING;
+            state->flags |= FLAG_END_CANDIDATE;
+            state->flags &= ~FLAG_INSTRING;
             state->counter = 1; // Use counter to keep track of number of '"' seen
             return 1;
         }
         // Check if we are parsing a long string or short string
         // No escape handling inside long strings
-        if(state->flags & PFLAG_LONGSTRING) {
+        if (state->flags & FLAG_LONGSTRING) {
             pushbuffer(p, c);
         } else {
             // Handle escape characters
@@ -187,7 +244,7 @@ int stringchar(Parser *p, ParseState *state, uint8_t c) {
             return 1;
         }
         return 1;
-    } else if (state->flags & PFLAG_END_CANDIDATE) {
+    } else if (state->flags & FLAG_END_CANDIDATE) {
         int i;
         // Check for potential end of the string
         if (state->counter == state->argn) {
@@ -205,8 +262,8 @@ int stringchar(Parser *p, ParseState *state, uint8_t c) {
         }
         pushbuffer(p, c);
         state->counter = 0; // Reset the counter of number of '"' seen
-        state->flags &= ~PFLAG_END_CANDIDATE;
-        state->flags |= PFLAG_INSTRING;
+        state->flags &= ~FLAG_END_CANDIDATE;
+        state->flags |= FLAG_INSTRING;
         return 1;
     } else {
         /* We are at beginning of string */
@@ -215,11 +272,14 @@ int stringchar(Parser *p, ParseState *state, uint8_t c) {
         // and we need to process the character. Likewise if we have already seen
         // 3 '"' characters we need to get started...
         if (c != '"' || state->argn >= 3) {
-            state->flags |= PFLAG_INSTRING;
+            if(state->argn == 2) {
+                p->error = "invalid string";
+            }
+            state->flags |= FLAG_INSTRING;
             pushbuffer(p, c);
         } else {
-            state->flags |= PFLAG_LONGSTRING;
-            state->flags &= ~PFLAG_INSTRING;
+            state->flags |= FLAG_LONGSTRING;
+            state->flags &= ~FLAG_INSTRING;
         }
         return 1;
     }
@@ -227,8 +287,41 @@ int stringchar(Parser *p, ParseState *state, uint8_t c) {
 }
 
 int checkescape(uint8_t c) {
-    // TODO: escape handling
-    return c;
+    switch (c) {
+        default:
+            return -1;
+        case 'a':
+            return 7;
+        case 'b':
+            return 8;
+        // Handle hex escapes separately
+        case 'x':
+        case 'u':
+        case 'U':
+            return 1;
+        case 'n':
+            return '\n';
+        case 't':
+            return '\t';
+        case 'r':
+            return '\r';
+        case '0':
+            return '\0';
+        case 'f':
+            return '\f';
+        case 'v':
+            return '\v';
+        case 'e':
+            return 27;
+        case '"':
+            return '"';
+        case '\'':
+            return '\'';
+        case '\\':
+            return '\\';
+        case '?':
+            return '?';
+    }
 }
 
 int escape(Parser *p, ParseState *state, uint8_t c) {
@@ -237,8 +330,16 @@ int escape(Parser *p, ParseState *state, uint8_t c) {
         p->error = "invalid string escape sequence";
         return 1;
     }
-    if (c == 'x') {
+    if (c == 'x') { // 2 hex digits
         state->counter = 2;
+        state->argn = 0;
+        state->consumer = escapehex;
+    } else if(c == 'u') { // Unicode 4 hex digits
+        state->counter = 4;
+        state->argn = 0;
+        state->consumer = escapehex;
+    } else if(c == 'U') { // Unicode 8 hex digits
+        state->counter = 8;
         state->argn = 0;
         state->consumer = escapehex;
     } else {
@@ -249,13 +350,35 @@ int escape(Parser *p, ParseState *state, uint8_t c) {
 }
 
 int escapehex(Parser *p, ParseState *state, uint8_t c) {
+    int digit = hex(c);
+    if (digit < 0) {
+        p->error = "invalid hex digit";
+        return 1;
+    }
+    state->argn = (state->argn << 4) + digit;
+    state->counter--;
+    if (!(state->counter % 2)) {
+        pushbuffer(p, (state->argn & 0xFF));
+        state->argn = 0;
+        if(!state->counter) {
+            state->consumer = stringchar;
+        }
+    }
+    return 1;
+}
+
+int linecomment(Parser *p, ParseState *state, uint8_t c) {
+    (void) state; // Pretend we use the state
+    if (c == '\n') {
+        p->statecount--; // Pop the state on a new line
+    }
     return 1;
 }
 
 int stringend(Parser *p, ParseState *state) {
     uint8_t *bufstart = p->buffer;
     int32_t buflen = (int32_t) p->buffercount;
-    if (state->flags & PFLAG_LONGSTRING) {
+    if (state->flags & FLAG_LONGSTRING) {
         /* Remove leading and trailing newline characters */
         if (bufstart[0] == '\n') {
             bufstart++;
@@ -270,12 +393,61 @@ int stringend(Parser *p, ParseState *state) {
     return 1;
 }
 
+/* Returns the current status of the parser */
+enum ParserStatus parser_status(Parser *parser) {
+    if (parser->error) return PARSE_ERROR;
+    if (parser->finished) return PARSE_DEAD;
+    if (parser->statecount > 1) return PARSE_PENDING;
+    return PARSE_ROOT;
+}
+
+// Check if the parser is in a state that allows it to continue
+void parser_ok(Parser *parser) {
+    if (parser->finished) {
+        // TODO: parser is finished
+    }
+    if (parser->error) {
+        // TODO: parser has error
+    }
+}
+
+// Consumes a single character
+void parser_consume(Parser *parser, uint8_t c) {
+    int consumed = 0;
+    parser_ok(parser);
+    parser->offset++;
+    if (c == '\n') {
+        parser->lineno++;
+        parser->colno = 1;
+    } else {
+        parser->colno++;
+    }
+    while (!consumed && !parser->error) {
+        ParseState *state = parser->states + parser->statecount - 1;
+        consumed = state->consumer(parser, state, c);
+    }
+    parser->current = c;
+}
+
+// Handle the end of the buffer
+void parser_eof(Parser *parser) {
+    parser_ok(parser);
+    parser_consume(parser, '\n');
+    if (parser->statecount > 1) {
+        parser->error = "unexpected end of input";
+    }
+    parser->offset--;
+    parser->finished = 1;
+}
+
+
 // Public functions
 void parser_init(Parser *parser) {
     parser->error = NULL;
     parser->offset = 0;
     parser->lineno = 1;
     parser->colno = 1;
+    parser->finished = 0;
 
     /* States */
     parser->states = NULL;

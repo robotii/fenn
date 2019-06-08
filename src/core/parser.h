@@ -26,13 +26,23 @@
 // Typedef to make things easier
 typedef struct Parser Parser;
 typedef struct ParseState ParseState;
-
 typedef int (*Consumer)(Parser *p, ParseState *state, uint8_t c);
+
+enum ParserStatus {
+    PARSE_ROOT,
+    PARSE_ERROR,
+    PARSE_PENDING,
+    PARSE_DEAD
+};
+
+
 struct ParseState {
     int32_t counter;
     int32_t argn;
     uint32_t flags;
     size_t start;
+    int32_t startline;
+    int32_t startcol;
     Consumer consumer;
 };
 
@@ -49,37 +59,51 @@ struct Parser {
     int offset;          // Stores the current offset into the buffer we are parsing
     int lineno;          // The current line number
     int colno;           // The current column number
+    int finished;        // Flag to show if we are finished parsing
+    uint8_t current;     // The current character being processed
 };
 
 /* Flags */
-#define PFLAG_CONTAINER     ((uint32_t)0x100)
-#define PFLAG_BUFFER        ((uint32_t)0x200)
-#define PFLAG_PARENS        ((uint32_t)0x400)
-#define PFLAG_SQRBRACKETS   ((uint32_t)0x800)
-#define PFLAG_CURLYBRACKETS ((uint32_t)0x1000)
-#define PFLAG_STRING        ((uint32_t)0x2000)
-#define PFLAG_LONGSTRING    ((uint32_t)0x4000)
-#define PFLAG_READERMAC     ((uint32_t)0x8000)
-#define PFLAG_ATSYM         ((uint32_t)0x10000)
-#define PFLAG_INSTRING      ((uint32_t)0x100000)
-#define PFLAG_END_CANDIDATE ((uint32_t)0x200000)
+#define FLAG_CONTAINER     ((uint32_t)0x100)
+#define FLAG_BUFFER        ((uint32_t)0x200)
+#define FLAG_PARENS        ((uint32_t)0x400)
+#define FLAG_SQRBRACKETS   ((uint32_t)0x800)
+#define FLAG_CURLYBRACKETS ((uint32_t)0x1000)
+#define FLAG_STRING        ((uint32_t)0x2000)
+#define FLAG_LONGSTRING    ((uint32_t)0x4000)
+#define FLAG_READERMAC     ((uint32_t)0x8000)
+#define FLAG_ATSYM         ((uint32_t)0x10000)
+#define FLAG_INSTRING      ((uint32_t)0x100000)
+#define FLAG_END_CANDIDATE ((uint32_t)0x200000)
 
 /* Function declarations */
+
+/* Character utilities */
 int is_whitespace(uint8_t);
 int is_symbol_char(uint8_t);
+int hex(uint8_t);
+int checkescape(uint8_t);
 
+/* State management */
 void pushstate(Parser *, Consumer, int);
+void popstate(Parser *);
 void pushbuffer(Parser *, uint8_t);
+
+/* Parser utility functions */
+enum ParserStatus parser_status(Parser *);
+int stringend(Parser *, ParseState *);
+void parser_ok(Parser *);
+void parser_consume(Parser *, uint8_t);
+void parser_eof(Parser *);
 
 /* Consumers */
 int expression(Parser *, ParseState *, uint8_t);
 int stringchar(Parser *, ParseState *, uint8_t);
 int escape(Parser *, ParseState *, uint8_t);
 int escapehex(Parser *, ParseState *, uint8_t);
-
-/* Utility functions */
-int checkescape(uint8_t);
-int stringend(Parser *, ParseState *);
+int linecomment(Parser *, ParseState *, uint8_t);
+int atsymbol(Parser *, ParseState *, uint8_t);
+int token(Parser *, ParseState *, uint8_t);
 
 /* Creation and destruction */
 void parser_init(Parser *);
