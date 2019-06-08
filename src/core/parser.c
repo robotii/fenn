@@ -461,6 +461,29 @@ void parser_ok(Parser *parser) {
     }
 }
 
+/* Flush the parser */
+void parser_flush(Parser *parser) {
+    parser->statecount = 1;
+    parser->buffercount = 0;
+}
+
+/* Returns the error string from the parser */
+const char *parser_error(Parser *parser) {
+    ParserStatus status = parser_status(parser);
+    if (status == PARSE_ERROR) {
+        const char *e = parser->error;
+        parser->error = NULL;
+        parser_flush(parser);
+        return e;
+    }
+    return NULL;
+}
+
+void parser_produce(Parser *parser) {
+    // TODO: implement
+}
+
+
 // Consumes a single character
 void parser_consume(Parser *parser, uint8_t c) {
     int consumed = 0;
@@ -479,7 +502,7 @@ void parser_consume(Parser *parser, uint8_t c) {
     parser->current = c;
 }
 
-// Handle the end of the buffer
+/* Handle the end of the buffer */
 void parser_eof(Parser *parser) {
     parser_ok(parser);
     parser_consume(parser, '\n');
@@ -491,7 +514,9 @@ void parser_eof(Parser *parser) {
 }
 
 
-// Public functions
+/* Public functions */
+
+/* Initialise the parser */
 void parser_init(Parser *parser) {
     parser->error = NULL;
     parser->offset = 0;
@@ -510,6 +535,7 @@ void parser_init(Parser *parser) {
     parser->buffercap = 0;
 }
 
+/* Free all memory allocated in this parser */
 void parser_destroy(Parser *parser) {
     // Free memory for buffer
     free(parser->buffer);

@@ -97,6 +97,10 @@ int stringend(Parser *, ParseState *);
 void parser_ok(Parser *);
 void parser_consume(Parser *, uint8_t);
 void parser_eof(Parser *);
+void janet_parser_flush(Parser *parser);
+const char *parser_error(Parser *parser);
+void parser_produce(Parser *parser);
+
 
 /* Consumers */
 int expression(Parser *, ParseState *, uint8_t);
@@ -112,3 +116,5 @@ void parser_init(Parser *);
 void parser_destroy(Parser *);
 
 #endif
+
+
