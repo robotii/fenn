@@ -26,6 +26,7 @@
 // Typedef to make things easier
 typedef struct Parser Parser;
 typedef struct ParseState ParseState;
+typedef enum ParserStatus ParserStatus;
 typedef int (*Consumer)(Parser *p, ParseState *state, uint8_t c);
 
 enum ParserStatus {
@@ -83,6 +84,7 @@ int is_whitespace(uint8_t);
 int is_symbol_char(uint8_t);
 int hex(uint8_t);
 int checkescape(uint8_t);
+int validate_utf8(const uint8_t *, int32_t);
 
 /* State management */
 void pushstate(Parser *, Consumer, int);
@@ -90,7 +92,7 @@ void popstate(Parser *);
 void pushbuffer(Parser *, uint8_t);
 
 /* Parser utility functions */
-enum ParserStatus parser_status(Parser *);
+ParserStatus parser_status(Parser *);
 int stringend(Parser *, ParseState *);
 void parser_ok(Parser *);
 void parser_consume(Parser *, uint8_t);

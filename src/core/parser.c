@@ -75,6 +75,12 @@ int hex(uint8_t c) {
     }
 }
 
+int validate_utf8(const uint8_t *str, int32_t len) {
+    // TODO: Validate the UTF-8
+    (void)str;
+    return len;
+}
+
 /* Parser Utility functions */
 
 /* Push the current consumer onto the state stack */
@@ -189,6 +195,7 @@ int expression(Parser *p, ParseState *state, uint8_t c) {
     }
 }
 
+/* Parse the "@" prefix */
 int atsymbol(Parser *p, ParseState *state, uint8_t c) {
     (void) state;
     p->statecount--; // Discard the current state
@@ -214,7 +221,49 @@ int atsymbol(Parser *p, ParseState *state, uint8_t c) {
 
 /* Parse a single token */
 int token(Parser *p, ParseState *state, uint8_t c) {
-    // TODO: Parse token
+    double numval; // Holds the number we have parsed
+    int32_t blen;
+    if (is_symbol_char(c)) {
+        pushbuffer(p, (uint8_t) c);
+        if (c > 127) {
+            state->argn = 1; // Used to indicate non ascii character detected
+        }
+        return 1;
+    }
+    /* Token finished */
+    blen = (int32_t) p->buffercount;
+    int start_dig = p->buffer[0] >= '0' && p->buffer[0] <= '9';
+    int start_num = start_dig || p->buffer[0] == '-' || p->buffer[0] == '+' || p->buffer[0] == '.';
+
+    if (p->buffer[0] == ':') {
+        // Return keyword
+    } else if (start_num /*&& we are able to convert to number */) {
+        // Return number
+    } else if (0 /* check if is "nil" */) {
+        // Return nil
+    } else if (0 /* check if is "false" */) {
+        // Return false
+    } else if (0 /* check if is "true" */) {
+        // Return true
+    } else if (p->buffer) {
+        if (start_dig) {
+            p->error = "symbol literal cannot start with a digit";
+            return 0;
+        } else {
+            // Validate utf-8
+            int valid = (!state->argn) || validate_utf8(p->buffer, blen);
+            if (!valid) {
+                p->error = "invalid utf-8";
+                return 0;
+            }
+            // Return the symbol
+        }
+    } else {
+        p->error = "empty symbol";
+        return 0;
+    }
+    p->buffercount = 0;
+    popstate(p);
     return 0;
 }
 
@@ -286,19 +335,18 @@ int stringchar(Parser *p, ParseState *state, uint8_t c) {
 
 }
 
+/* Handle escape sequences */
 int checkescape(uint8_t c) {
     switch (c) {
-        default:
-            return -1;
-        case 'a':
-            return 7;
-        case 'b':
-            return 8;
         // Handle hex escapes separately
         case 'x':
         case 'u':
         case 'U':
             return 1;
+        case 'a':
+            return 7;
+        case 'b':
+            return 8;
         case 'n':
             return '\n';
         case 't':
@@ -321,6 +369,8 @@ int checkescape(uint8_t c) {
             return '\\';
         case '?':
             return '?';
+        default:
+            return -1;
     }
 }
 
@@ -394,7 +444,7 @@ int stringend(Parser *p, ParseState *state) {
 }
 
 /* Returns the current status of the parser */
-enum ParserStatus parser_status(Parser *parser) {
+ParserStatus parser_status(Parser *parser) {
     if (parser->error) return PARSE_ERROR;
     if (parser->finished) return PARSE_DEAD;
     if (parser->statecount > 1) return PARSE_PENDING;
