@@ -91,6 +91,23 @@ void pushstate(Parser *p, Consumer consumer, int flags) {
     _pushstate(p, s);
 }
 
+void pushbuffer(Parser *p, uint8_t x) {
+    size_t oldcount = p->buffercount;
+    size_t newcount = oldcount + 1;
+    if (newcount > p->buffercap) {
+        uint8_t *next;
+        size_t newcap = 2 * newcount;
+        next = realloc(p->buffer, sizeof(uint8_t) * newcap);
+        if (NULL == next) {
+            // TODO: Handle Out of Memory error
+        }
+        p->buffer = next;
+        p->buffercap = newcap;
+    }
+    p->buffer[oldcount] = x;
+    p->buffercount = newcount;
+}
+
 
 /* Parses a single expression - returns the number of characters consumed */
 int expression(Parser *p, ParseState *state, uint8_t c) {
@@ -102,12 +119,12 @@ int expression(Parser *p, ParseState *state, uint8_t c) {
         // fallthrough
         case ';':  // splice
         // fallthrough
-        case '`':  // quasiquote
+        case '`':  // quasi-quote
             return 1;
 
         /* String */
         case '"':
-            // Read string
+            pushstate(p, stringchar, PFLAG_STRING);
             return 1;
 
         /* Comment until end of line */
@@ -144,6 +161,115 @@ int expression(Parser *p, ParseState *state, uint8_t c) {
     }
 }
 
+int stringchar(Parser *p, ParseState *state, uint8_t c) {
+    if (state->flags & PFLAG_INSTRING) {
+        // We are inside the long string
+        if (c == '"') {
+            // We have seen a '"', so we need to check if the string is ending
+            state->flags |= PFLAG_END_CANDIDATE;
+            state->flags &= ~PFLAG_INSTRING;
+            state->counter = 1; // Use counter to keep track of number of '"' seen
+            return 1;
+        }
+        // Check if we are parsing a long string or short string
+        // No escape handling inside long strings
+        if(state->flags & PFLAG_LONGSTRING) {
+            pushbuffer(p, c);
+        } else {
+            // Handle escape characters
+            if (c == '\\') {
+                state->consumer = escape;
+                return 1;
+            }
+            // Handle normal characters - newlines are removed in short strings
+            if (c != '\n')
+                pushbuffer(p, c);
+            return 1;
+        }
+        return 1;
+    } else if (state->flags & PFLAG_END_CANDIDATE) {
+        int i;
+        // Check for potential end of the string
+        if (state->counter == state->argn) {
+            stringend(p, state);
+            return 0;
+        }
+        // Keep track of the number of '"' we have seen
+        if (c == '"' && state->counter < state->argn) {
+            state->counter++;
+            return 1;
+        }
+        // This is not the end of the string
+        for (i = 0; i < state->counter; i++) {
+            pushbuffer(p, '"');
+        }
+        pushbuffer(p, c);
+        state->counter = 0; // Reset the counter of number of '"' seen
+        state->flags &= ~PFLAG_END_CANDIDATE;
+        state->flags |= PFLAG_INSTRING;
+        return 1;
+    } else {
+        /* We are at beginning of string */
+        state->argn++;
+        // If we see anything other than a '"' we are now inside the string
+        // and we need to process the character. Likewise if we have already seen
+        // 3 '"' characters we need to get started...
+        if (c != '"' || state->argn >= 3) {
+            state->flags |= PFLAG_INSTRING;
+            pushbuffer(p, c);
+        } else {
+            state->flags |= PFLAG_LONGSTRING;
+            state->flags &= ~PFLAG_INSTRING;
+        }
+        return 1;
+    }
+
+}
+
+int checkescape(uint8_t c) {
+    // TODO: escape handling
+    return c;
+}
+
+int escape(Parser *p, ParseState *state, uint8_t c) {
+    int e = checkescape(c);
+    if (e < 0) {
+        p->error = "invalid string escape sequence";
+        return 1;
+    }
+    if (c == 'x') {
+        state->counter = 2;
+        state->argn = 0;
+        state->consumer = escapehex;
+    } else {
+        pushbuffer(p, (uint8_t) e);
+        state->consumer = stringchar;
+    }
+    return 1;
+}
+
+int escapehex(Parser *p, ParseState *state, uint8_t c) {
+    return 1;
+}
+
+int stringend(Parser *p, ParseState *state) {
+    uint8_t *bufstart = p->buffer;
+    int32_t buflen = (int32_t) p->buffercount;
+    if (state->flags & PFLAG_LONGSTRING) {
+        /* Remove leading and trailing newline characters */
+        if (bufstart[0] == '\n') {
+            bufstart++;
+            buflen--;
+        }
+        if (buflen > 0 && bufstart[buflen - 1] == '\n') {
+            buflen--;
+        }
+        // TODO: Parse this out into a string value
+    }
+    p->buffercount = 0;
+    return 1;
+}
+
 // Public functions
 void parser_init(Parser *parser) {
     parser->error = NULL;
@@ -155,6 +281,11 @@ void parser_init(Parser *parser) {
     parser->states = NULL;
     parser->statecount = 0;
     parser->statecap = 0;
+
+    /* Buffer */
+    parser->buffer = NULL;
+    parser->buffercount = 0;
+    parser->buffercap = 0;
 }
 
 void parser_destroy(Parser *parser) {
