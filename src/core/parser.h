@@ -50,17 +50,27 @@ struct ParseState {
 /* The Fenn parser structure */
 struct Parser {
     const char *error;   // The current error
-    ParseState *states;  // Store the stack of ParseStates
 
+    // State
+    ParseState *states;  // Store the stack of ParseStates
     size_t statecount;   // Number of states on the stack
     size_t statecap;     // Number of states allocated
-    uint8_t *buffer;     // The buffer we are currently parsing
-    size_t  buffercount; // Size of the current buffer
-    size_t  buffercap;   // Capacity of the buffer
     int offset;          // Stores the current offset into the buffer we are parsing
     int lineno;          // The current line number
     int colno;           // The current column number
     int finished;        // Flag to show if we are finished parsing
+    int pending;         // How many values we have pending
+
+    // Buffer
+    uint8_t *buffer;     // The buffer we are currently parsing into
+    size_t  buffercount; // Size of the current buffer
+    size_t  buffercap;   // Capacity of the buffer
+
+    // Values
+    FennObject *values;  // Stack of values to return
+    size_t valuecount;   // Number of values present on the stack
+    size_t valuecap;     // Capacity of the value stack
+
     uint8_t current;     // The current character being processed
 };
 
@@ -90,6 +100,7 @@ int validate_utf8(const uint8_t *, int32_t);
 void pushstate(Parser *, Consumer, int);
 void popstate(Parser *);
 void pushbuffer(Parser *, uint8_t);
+void pushvalue(Parser *, FennObject);
 
 /* Parser utility functions */
 ParserStatus parser_status(Parser *);
@@ -99,8 +110,7 @@ void parser_consume(Parser *, uint8_t);
 void parser_eof(Parser *);
 void janet_parser_flush(Parser *parser);
 const char *parser_error(Parser *parser);
-void parser_produce(Parser *parser);
-
+FennObject parser_produce(Parser *parser);
 
 /* Consumers */
 int expression(Parser *, ParseState *, uint8_t);

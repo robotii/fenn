@@ -38,6 +38,16 @@ extern "C" {
 #include <stddef.h>
 #include <stdio.h>
 
+typedef union FennObject FennObject;
+
+// Universal type for Fenn objects
+union FennObject {
+    uint64_t u64;
+    int64_t i64;
+    double num;
+    void *ptr;
+};
+
 #ifdef __cplusplus
 }
 #endif

@@ -117,6 +117,7 @@ void popstate(Parser *p) {
     // TODO: Process the values returned
 }
 
+/* Push a character onto the end of the buffer */
 void pushbuffer(Parser *p, uint8_t x) {
     size_t oldcount = p->buffercount;
     size_t newcount = oldcount + 1;
@@ -132,6 +133,24 @@ void pushbuffer(Parser *p, uint8_t x) {
     }
     p->buffer[oldcount] = x;
     p->buffercount = newcount;
+}
+
+/* Push a value onto the stack */
+void pushvalue(Parser *p, FennObject x) {
+    size_t oldcount = p->valuecount;
+    size_t newcount = oldcount + 1;
+    if (newcount > p->valuecap) {
+        FennObject *next;
+        size_t newcap = 2 * newcount;
+        next = realloc(p->values, sizeof(FennObject) * newcap);
+        if (NULL == next) {
+            // TODO: Handle Out Of Memory error
+        }
+        p->values = next;
+        p->valuecap = newcap;
+    }
+    p->values[oldcount] = x;
+    p->valuecount = newcount;
 }
 
 /* Consumer functions */
@@ -230,7 +249,7 @@ int token(Parser *p, ParseState *state, uint8_t c) {
         }
         return 1;
     }
-    /* Token finished */
+    // Token finished
     blen = (int32_t) p->buffercount;
     int start_dig = p->buffer[0] >= '0' && p->buffer[0] <= '9';
     int start_num = start_dig || p->buffer[0] == '-' || p->buffer[0] == '+' || p->buffer[0] == '.';
@@ -306,6 +325,7 @@ int stringchar(Parser *p, ParseState *state, uint8_t c) {
             return 1;
         }
         // This is not the end of the string
+        // so we push the correct number of '"' back into the buffer
         for (i = 0; i < state->counter; i++) {
             pushbuffer(p, '"');
         }
@@ -315,12 +335,13 @@ int stringchar(Parser *p, ParseState *state, uint8_t c) {
         state->flags |= FLAG_INSTRING;
         return 1;
     } else {
-        /* We are at beginning of string */
+        // We are at the beginning of the string
         state->argn++;
         // If we see anything other than a '"' we are now inside the string
         // and we need to process the character. Likewise if we have already seen
         // 3 '"' characters we need to get started...
         if (c != '"' || state->argn >= 3) {
+            // If we have two characters then we have an error
             if(state->argn == 2) {
                 p->error = "invalid string";
             }
@@ -420,7 +441,7 @@ int escapehex(Parser *p, ParseState *state, uint8_t c) {
 int linecomment(Parser *p, ParseState *state, uint8_t c) {
     (void) state; // Pretend we use the state
     if (c == '\n') {
-        p->statecount--; // Pop the state on a new line
+        p->statecount--; // Pop the state when we see a new line
     }
     return 1;
 }
@@ -479,8 +500,19 @@ const char *parser_error(Parser *parser) {
     return NULL;
 }
 
-void parser_produce(Parser *parser) {
-    // TODO: implement
+FennObject parser_produce(Parser *parser) {
+    FennObject ret;
+    size_t i;
+    if (parser->pending == 0) {
+        return (FennObject)NULL;
+    }
+    ret = parser->values[0];
+    for (i = 1; i < parser->valuecount; i++) {
+        parser->values[i - 1] = parser->values[i];
+    }
+    parser->pending--;
+    parser->valuecount--;
+    return ret;
 }
 
 
@@ -533,6 +565,11 @@ void parser_init(Parser *parser) {
     parser->buffer = NULL;
     parser->buffercount = 0;
     parser->buffercap = 0;
+
+    // Values
+    parser->values = NULL;
+    parser->valuecount = 0;
+    parser->valuecap = 0;
 }
 
 /* Free all memory allocated in this parser */
@@ -541,4 +578,6 @@ void parser_destroy(Parser *parser) {
     free(parser->buffer);
     // Free memory for states
     free(parser->states);
+    // Free memory for values
+    free(parser->values);
 }
