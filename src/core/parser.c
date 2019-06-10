@@ -22,6 +22,7 @@
 
 #include <fenn.h>
 #include <parser.h>
+#include "tuple.h"
 
 /* First we have the utility functions to check the types of characters */
 
@@ -111,10 +112,48 @@ void pushstate(Parser *p, Consumer consumer, int flags) {
     p->statecount = newcount;
 }
 
-void popstate(Parser *p) {
-    ParseState top = p->states[--p->statecount];
-    ParseState *newtop = p->states + p->statecount - 1;
-    // TODO: Process the values returned
+void popstate(Parser *p, FennObject value) {
+    for (;;) {
+        ParseState top = p->states[--p->statecount];
+        ParseState *newtop = p->states + p->statecount - 1;
+        if (newtop->flags & FLAG_CONTAINER) {
+            /* Source mapping info */
+            if (fenn_checktype(value, FENN_TUPLE)) {
+                fenn_tuple_sm_start(fenn_unwrap_tuple(value)) = (int32_t) top.start;
+                fenn_tuple_sm_startline(fenn_unwrap_tuple(value)) = top.startline;
+                fenn_tuple_sm_startcol(fenn_unwrap_tuple(value)) = top.startcol;
+                fenn_tuple_sm_end(fenn_unwrap_tuple(value)) = (int32_t) p->offset;
+                fenn_tuple_sm_endline(fenn_unwrap_tuple(value)) = p->lineno;
+                fenn_tuple_sm_endcol(fenn_unwrap_tuple(value)) = p->colno;
+            }
+            newtop->argn++;
+            /* Keep track of number of values in the root state */
+            if (p->statecount == 1) p->pending++;
+            pushvalue(p, value);
+            return;
+        } else if (newtop->flags & FLAG_READERMAC) {
+            FennObject *t = fenn_tuple_begin(2);
+            int c = newtop->flags & 0xFF;
+            const char *which =
+                    (c == '\'') ? "quote" :
+                    (c == ',') ? "unquote" :
+                    (c == ';') ? "splice" :
+                    (c == '~') ? "quasiquote" : "<unknown>";
+            // TODO: Lookup symbol from which
+            t[0] = (FennObject)NULL;
+            t[1] = value;
+            /* Quote source mapping info */
+            fenn_tuple_sm_start(t) = (int32_t) newtop->start;
+            fenn_tuple_sm_startline(t) = top.startline;
+            fenn_tuple_sm_startcol(t) = top.startcol;
+            fenn_tuple_sm_end(t) = (int32_t) p->offset;
+            fenn_tuple_sm_endline(t) = p->lineno;
+            fenn_tuple_sm_endcol(t) = p->colno;
+            value = fenn_wrap_tuple(fenn_tuple_end(t));
+        } else {
+            return;
+        }
+    }
 }
 
 /* Push a character onto the end of the buffer */
@@ -240,6 +279,7 @@ int atsymbol(Parser *p, ParseState *state, uint8_t c) {
 
 /* Parse a single token */
 int token(Parser *p, ParseState *state, uint8_t c) {
+    FennObject value = (FennObject)NULL;
     double numval; // Holds the number we have parsed
     int32_t blen;
     if (is_symbol_char(c)) {
@@ -282,7 +322,7 @@ int token(Parser *p, ParseState *state, uint8_t c) {
         return 0;
     }
     p->buffercount = 0;
-    popstate(p);
+    popstate(p,value);
     return 0;
 }
 
@@ -469,7 +509,7 @@ ParserStatus parser_status(Parser *parser) {
     if (parser->error) return PARSE_ERROR;
     if (parser->finished) return PARSE_DEAD;
     if (parser->statecount > 1) return PARSE_PENDING;
-    return PARSE_ROOT;
+    return PARSE_OK;
 }
 
 // Check if the parser is in a state that allows it to continue

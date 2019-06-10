@@ -30,12 +30,11 @@ typedef enum ParserStatus ParserStatus;
 typedef int (*Consumer)(Parser *p, ParseState *state, uint8_t c);
 
 enum ParserStatus {
-    PARSE_ROOT,
+    PARSE_OK,
     PARSE_ERROR,
     PARSE_PENDING,
     PARSE_DEAD
 };
-
 
 struct ParseState {
     int32_t counter;
@@ -98,7 +97,7 @@ int validate_utf8(const uint8_t *, int32_t);
 
 /* State management */
 void pushstate(Parser *, Consumer, int);
-void popstate(Parser *);
+void popstate(Parser *, FennObject);
 void pushbuffer(Parser *, uint8_t);
 void pushvalue(Parser *, FennObject);
 
@@ -108,7 +107,7 @@ int stringend(Parser *, ParseState *);
 void parser_ok(Parser *);
 void parser_consume(Parser *, uint8_t);
 void parser_eof(Parser *);
-void janet_parser_flush(Parser *parser);
+void parser_flush(Parser *parser);
 const char *parser_error(Parser *parser);
 FennObject parser_produce(Parser *parser);
 
