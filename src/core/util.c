@@ -22,8 +22,8 @@
 
 #include <fenn.h>
 #include "util.h"
-#include "ftuple.h"
-#include "fstring.h"
+#include "objects/ftuple.h"
+#include "objects/fstring.h"
 
 /* Computes hash of an array of values */
 int32_t fenn_array_calchash(const FennObject *array, int32_t len) {

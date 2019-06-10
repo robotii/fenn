@@ -22,9 +22,9 @@
 
 #include <fenn.h>
 #include <parser.h>
-#include "fstring.h"
-#include "ftuple.h"
-#include "fbuffer.h"
+#include "objects/fstring.h"
+#include "objects/ftuple.h"
+#include "objects/fbuffer.h"
 
 /* First we have the utility functions to check the types of characters */
 

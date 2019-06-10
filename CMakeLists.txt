@@ -12,14 +12,14 @@ if("${CMAKE_C_COMPILER_ID}" STREQUAL "AppleClang")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-return-type")
 endif()
 
-include_directories(src/include src/core)
+include_directories(src/include src/core src/core/objects)
 
 set(fenn-core
-        src/core/fbuffer.c
-        src/core/fstring.c
+        src/core/objects/fbuffer.c
+        src/core/objects/fstring.c
         src/core/gc.c
         src/core/parser.c
-        src/core/ftuple.c
+        src/core/objects/ftuple.c
         src/core/util.c
         )
 
