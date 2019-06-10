@@ -23,7 +23,7 @@
 #include <fenn.h>
 #include <parser.h>
 #include "fstring.h"
-#include "tuple.h"
+#include "ftuple.h"
 
 /* First we have the utility functions to check the types of characters */
 

@@ -21,7 +21,7 @@
 */
 
 #include <fenn.h>
-#include "tuple.h"
+#include "ftuple.h"
 #include "util.h"
 
 FennObject *fenn_tuple_begin(int32_t length) {

@@ -22,7 +22,7 @@
 
 #include <fenn.h>
 #include "util.h"
-#include "tuple.h"
+#include "ftuple.h"
 #include "fstring.h"
 
 /* Computes hash of an array of values */

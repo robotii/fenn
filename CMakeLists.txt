@@ -18,7 +18,7 @@ set(fenn-core
         src/core/fstring.c
         src/core/gc.c
         src/core/parser.c
-        src/core/tuple.c
+        src/core/ftuple.c
         src/core/util.c
         )
 
