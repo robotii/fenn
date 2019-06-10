@@ -20,13 +20,28 @@
 * IN THE SOFTWARE.
 */
 
-#ifndef UTIL_H
-#define UTIL_H
+#ifndef STRING_H
+#define STRING_H
 
-int32_t fenn_array_calchash(const FennObject *, int32_t);
-int32_t fenn_string_calchash(const uint8_t *, int32_t);
-int32_t fenn_hash(FennObject x);
-int fenn_equals(FennObject, FennObject);
-int fenn_compare(FennObject, FennObject);
+typedef struct FennStringHead FennStringHead;
+
+struct FennStringHead {
+    FennGCObject gc;
+    int32_t length;
+    int32_t hash;
+    const uint8_t data[];
+};
+
+#define fenn_string_head(s) ((FennStringHead *)((char *)s - offsetof(FennStringHead, data)))
+#define fenn_string_length(s) (fenn_string_head(s)->length)
+#define fenn_string_hash(s) (fenn_string_head(s)->hash)
+
+uint8_t *fenn_string_begin(int32_t);
+const uint8_t *fenn_string_end(uint8_t *);
+const uint8_t *fenn_string(const uint8_t *, int32_t);
+int fenn_string_compare(const uint8_t *, const uint8_t *);
+int fenn_string_equalconst(const uint8_t *lhs, const uint8_t *, int32_t, int32_t);
+int fenn_string_equal(const uint8_t *, const uint8_t *);
+const uint8_t *fenn_cstring(const char *);
 
 #endif

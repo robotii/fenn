@@ -23,6 +23,7 @@
 #include <fenn.h>
 #include "util.h"
 #include "tuple.h"
+#include "fstring.h"
 
 /* Computes hash of an array of values */
 int32_t fenn_array_calchash(const FennObject *array, int32_t len) {
@@ -30,6 +31,14 @@ int32_t fenn_array_calchash(const FennObject *array, int32_t len) {
     uint32_t hash = 5381;
     while (array < end)
         hash = (hash << 5) + hash + fenn_hash(*array++);
+    return (int32_t) hash;
+}
+
+int32_t fenn_string_calchash(const uint8_t *str, int32_t len) {
+    const uint8_t *end = str + len;
+    uint32_t hash = 5381;
+    while (str < end)
+        hash = (hash << 5) + hash + *str++;
     return (int32_t) hash;
 }
 
@@ -50,7 +59,7 @@ int fenn_equals(FennObject x, FennObject y) {
                 result = (fenn_unwrap_number(x) == fenn_unwrap_number(y));
                 break;
             case FENN_STRING:
-                // TODO: Compare strings
+                result = fenn_string_equal(fenn_unwrap_string(x), fenn_unwrap_string(y));
                 break;
             case FENN_TUPLE:
                 result = fenn_tuple_equal(fenn_unwrap_tuple(x), fenn_unwrap_tuple(y));
@@ -80,7 +89,7 @@ int32_t fenn_hash(FennObject x) {
         case FENN_STRING:
         case FENN_SYMBOL:
         case FENN_KEYWORD:
-            // String hash
+            hash= fenn_string_hash(fenn_unwrap_string(x));
             break;
         case FENN_TUPLE:
             hash = fenn_tuple_hash(fenn_unwrap_tuple(x));
@@ -133,7 +142,7 @@ int fenn_compare(FennObject x, FennObject y) {
             case FENN_STRING:
             case FENN_SYMBOL:
             case FENN_KEYWORD:
-                // Compare strings
+                return fenn_string_compare(fenn_unwrap_string(x), fenn_unwrap_string(y));
             case FENN_TUPLE:
                 return fenn_tuple_compare(fenn_unwrap_tuple(x), fenn_unwrap_tuple(y));
             case FENN_STRUCT:

@@ -22,6 +22,7 @@
 
 #include <fenn.h>
 #include <parser.h>
+#include "fstring.h"
 #include "tuple.h"
 
 /* First we have the utility functions to check the types of characters */
@@ -199,11 +200,8 @@ int expression(Parser *p, ParseState *state, uint8_t c) {
     switch (c) {
         // Special characters
         case '\'': // quote
-            // fallthrough
         case ',':  // unquote
-            // fallthrough
         case ';':  // splice
-            // fallthrough
         case '`':  // quasi-quote
             pushstate(p, expression, FLAG_READERMAC | c);
             return 1;
@@ -487,6 +485,7 @@ int linecomment(Parser *p, ParseState *state, uint8_t c) {
 }
 
 int stringend(Parser *p, ParseState *state) {
+    FennObject ret;
     uint8_t *bufstart = p->buffer;
     int32_t buflen = (int32_t) p->buffercount;
     if (state->flags & FLAG_LONGSTRING) {
@@ -498,9 +497,15 @@ int stringend(Parser *p, ParseState *state) {
         if (buflen > 0 && bufstart[buflen - 1] == '\n') {
             buflen--;
         }
+        if (state->flags & FLAG_BUFFER) {
+            // TODO: Create a buffer
+        } else {
+            ret = fenn_wrap_string(fenn_string(bufstart, buflen));
+        }
         // TODO: Parse this out into a string value
     }
     p->buffercount = 0;
+    popstate(p, ret);
     return 1;
 }
 
