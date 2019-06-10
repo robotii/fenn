@@ -176,3 +176,9 @@ void *fenn_to_pointer(FennObject x) {
     x.u64 &= FENN_PAYLOAD;
     return x.ptr;
 }
+
+FennObject fenn_from_bits(uint64_t bits) {
+    FennObject o;
+    o.u64 = bits;
+    return o;
+}
