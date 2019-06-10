@@ -95,6 +95,8 @@ int hex(uint8_t);
 int checkescape(uint8_t);
 int validate_utf8(const uint8_t *, int32_t);
 
+int check_str_const(const char *, const uint8_t *, int32_t);
+
 /* State management */
 void pushstate(Parser *, Consumer, int);
 void popstate(Parser *, FennObject);

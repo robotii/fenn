@@ -24,6 +24,7 @@
 #include <parser.h>
 #include "fstring.h"
 #include "ftuple.h"
+#include "fbuffer.h"
 
 /* First we have the utility functions to check the types of characters */
 
@@ -81,6 +82,18 @@ int validate_utf8(const uint8_t *str, int32_t len) {
     // TODO: Validate the UTF-8
     (void)str;
     return len;
+}
+
+int check_str_const(const char *cstr, const uint8_t *str, int32_t len) {
+    int32_t index;
+    for (index = 0; index < len; index++) {
+        uint8_t c = str[index];
+        uint8_t k = ((const uint8_t *)cstr)[index];
+        if (c < k) return -1;
+        if (c > k) return 1;
+        if (k == '\0') break;
+    }
+    return (cstr[index] == '\0') ? 0 : -1;
 }
 
 /* Parser Utility functions */
@@ -296,12 +309,12 @@ int token(Parser *p, ParseState *state, uint8_t c) {
         // Return keyword
     } else if (start_num /*&& we are able to convert to number */) {
         // Return number
-    } else if (0 /* check if is "nil" */) {
-        // Return nil
-    } else if (0 /* check if is "false" */) {
-        // Return false
-    } else if (0 /* check if is "true" */) {
-        // Return true
+    } else if (!check_str_const("nil", p->buffer, blen)) {
+        value = fenn_wrap_nil();
+    } else if (!check_str_const("false", p->buffer, blen)) {
+        value = fenn_wrap_false();
+    } else if (!check_str_const("true", p->buffer, blen)) {
+        value = fenn_wrap_true();
     } else if (p->buffer) {
         if (start_dig) {
             p->error = "symbol literal cannot start with a digit";
@@ -313,7 +326,7 @@ int token(Parser *p, ParseState *state, uint8_t c) {
                 p->error = "invalid utf-8";
                 return 0;
             }
-            // Return the symbol
+            // TODO: Return the symbol
         }
     } else {
         p->error = "empty symbol";
@@ -498,11 +511,12 @@ int stringend(Parser *p, ParseState *state) {
             buflen--;
         }
         if (state->flags & FLAG_BUFFER) {
-            // TODO: Create a buffer
+            FennBuffer *b = fenn_buffer(buflen);
+            fenn_buffer_push_bytes(b, bufstart, buflen);
+            ret = fenn_wrap_buffer(b);
         } else {
             ret = fenn_wrap_string(fenn_string(bufstart, buflen));
         }
-        // TODO: Parse this out into a string value
     }
     p->buffercount = 0;
     popstate(p, ret);

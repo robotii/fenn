@@ -68,7 +68,7 @@ int fenn_equals(FennObject x, FennObject y) {
                 // TODO: Compare structs
                 break;
             default:
-                /* compare pointers */
+                // Compare pointers
                 result = (fenn_unwrap_pointer(x) == fenn_unwrap_pointer(y));
                 break;
         }
@@ -146,8 +146,9 @@ int fenn_compare(FennObject x, FennObject y) {
             case FENN_TUPLE:
                 return fenn_tuple_compare(fenn_unwrap_tuple(x), fenn_unwrap_tuple(y));
             case FENN_STRUCT:
-                // Compare structs
+                // TODO: Compare structs
             default:
+                // Compare pointer values
                 if (fenn_unwrap_string(x) == fenn_unwrap_string(y)) {
                     return 0;
                 } else {

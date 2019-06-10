@@ -15,6 +15,7 @@ endif()
 include_directories(src/include src/core)
 
 set(fenn-core
+        src/core/fbuffer.c
         src/core/fstring.c
         src/core/gc.c
         src/core/parser.c
